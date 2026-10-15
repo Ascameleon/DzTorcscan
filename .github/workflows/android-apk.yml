@@ -35,6 +35,10 @@ jobs:
           if [ -f pubspec.yaml ]; then echo "PROJECT_DIR=." >> "$GITHUB_ENV"
           elif [ -f obd2_scanner/pubspec.yaml ]; then echo "PROJECT_DIR=obd2_scanner" >> "$GITHUB_ENV"
           else echo "Flutter project pubspec.yaml not found" >&2; exit 1; fi
+      - name: Static preflight
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          if [ -f scripts/preflight.py ]; then python3 scripts/preflight.py; else echo "Preflight script unavailable; continuing to Flutter checks."; fi
       - name: Install dependencies
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter pub get
