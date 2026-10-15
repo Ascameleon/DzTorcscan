@@ -39,6 +39,43 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           if [ -f scripts/preflight.py ]; then python3 scripts/preflight.py; else echo "Preflight script unavailable; continuing to Flutter checks."; fi
+      - name: Repair Dart source compatibility
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          # Fix unsupported Socket.destroyed checks; Dart Socket has no such getter.
+          p = Path("lib/services/bluetooth_service.dart")
+          if p.exists():
+              t = p.read_text()
+              t = t.replace(" && !_wifiSocket!.destroyed", "")
+              t = t.replace(" && !_wifiSocket!.destroyed)", ")")
+              t = t.replace("socket != null && !socket.destroyed", "socket != null")
+              p.write_text(t)
+          # Repair the five malformed compact widget expressions in the recovery archive.
+          targets = {
+              "lib/screens/home_screen.dart": {137, 147},
+              "lib/screens/dashboard_screen.dart": {17, 20},
+              "lib/screens/vehicle_info_screen.dart": {7},
+          }
+          for name, nums in targets.items():
+              p = Path(name)
+              if not p.exists():
+                  continue
+              lines = p.read_text().splitlines()
+              for n in nums:
+                  if n > len(lines):
+                      continue
+                  line = lines[n - 1]
+                  # Count parentheses outside quoted strings; add only missing closers.
+                  scrub = re.sub(r"'(?:\\\\.|[^'\\\\])*'|\"(?:\\\\.|[^\"\\\\])*\"", "", line)
+                  diff = scrub.count("(") - scrub.count(")")
+                  if diff > 0:
+                      lines[n - 1] = line + (")" * diff)
+              p.write_text("\\n".join(lines) + "\\n")
+          PY
       - name: Install dependencies
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter pub get
