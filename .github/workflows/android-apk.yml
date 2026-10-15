@@ -21,6 +21,14 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Extract archived Flutter source if needed
+        shell: bash
+        run: |
+          if [ ! -f pubspec.yaml ] && [ ! -f obd2_scanner/pubspec.yaml ]; then
+            ARCHIVE="$(find . -maxdepth 1 -type f -name 'DzTorqscan_source_recovery_v*.zip' | sort -V | tail -n 1)"
+            if [ -z "$ARCHIVE" ]; then echo "No Flutter source archive found" >&2; exit 1; fi
+            unzip -oq "$ARCHIVE" -d .
+          fi
       - name: Locate Flutter project
         shell: bash
         run: |
