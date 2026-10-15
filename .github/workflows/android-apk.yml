@@ -73,6 +73,16 @@ jobs:
           if 'id "org.jetbrains.kotlin.android"' not in s:
               s = s.replace('id "com.android.application"', 'id "com.android.application"\n    id "org.jetbrains.kotlin.android"')
           p.write_text(s)
+          # Normalize plugin versions across both modern and legacy Gradle templates.
+          import re
+          for name in ("android/settings.gradle", "android/build.gradle", "android/app/build.gradle"):
+              p = Path(name)
+              if p.exists():
+                  t = p.read_text()
+                  t = re.sub(r'(org\\.jetbrains\\.kotlin\\.android["\\']?\\s*(?:version\\s*)?["\\']?)(2\\.\\d+\\.\\d+)', r'\\g<1>2.2.20', t)
+                  t = re.sub(r'(ext\\.kotlin_version\\s*=\\s*["\\'])[^"\\']+(["\\'])', r'\\g<1>2.2.20\\g<2>', t)
+                  t = re.sub(r'(com\\.android\\.application["\\']?\\s*version\\s*["\\']?)(9\\.0\\.0)', r'\\g<1>8.11.1', t)
+                  p.write_text(t)
           PY
           chmod +x android/gradlew
       - name: Build release APK
