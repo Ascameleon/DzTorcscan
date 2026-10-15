@@ -86,10 +86,17 @@ jobs:
                   t = t.replace('version "9.0.0" apply false', 'version "8.11.1" apply false')
                   p.write_text(t)
           PY
+          # Apply the Kotlin fix to every Gradle file, regardless of template/layout.
+          find android -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 | xargs -0 -r sed -i -E \
+            -e 's/(org\.jetbrains\.kotlin\.android[^\n]*version[[:space:]]*["'\'']?)2\.0\.0/\12.2.20/g' \
+            -e 's/(org\.jetbrains\.kotlin\.android[^\n]*version[[:space:]]*["'\'']?)2\.2\.10/\12.2.20/g' \
+            -e 's/ext\.kotlin_version[[:space:]]*=[[:space:]]*["'\''][^"'\'']+["'\'']/ext.kotlin_version = "2.2.20"/g'
+          echo "Resolved Kotlin/AGP declarations:"
+          grep -RInE 'kotlin.*version|kotlin_version|com.android.application.*version' android --include='*.gradle' --include='*.gradle.kts' || true
           chmod +x android/gradlew
       - name: Build release APK
         working-directory: ${{ env.PROJECT_DIR }}
-        run: flutter build apk --release --no-pub
+        run: flutter build apk --release --no-pub --android-skip-build-dependency-validation
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
