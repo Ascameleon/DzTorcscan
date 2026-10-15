@@ -74,7 +74,7 @@ jobs:
                   diff = scrub.count("(") - scrub.count(")")
                   if diff > 0:
                       lines[n - 1] = line + (")" * diff)
-              p.write_text("\\n".join(lines) + "\\n")
+              p.write_text("\n".join(lines) + "\n")
           PY
       - name: Install dependencies
         working-directory: ${{ env.PROJECT_DIR }}
