@@ -1,0 +1,70 @@
+name: DzTorqscan APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'DzTorqscan_source_recovery_v*.zip'
+      - '.github/workflows/android-build-clean.yml'
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Extract project
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f pubspec.yaml ]; then
+            archive="$(find . -maxdepth 1 -type f -name 'DzTorqscan_source_recovery_v*.zip' | sort -V | tail -n 1)"
+            test -n "$archive"
+            unzip -oq "$archive" -d extracted
+            project="$(find extracted -maxdepth 4 -name pubspec.yaml -print -quit)"
+            test -n "$project"
+            echo "PROJECT_DIR=$(dirname "$project")" >> "$GITHUB_ENV"
+          else
+            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
+          fi
+
+      - name: Resolve dependencies
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: flutter pub get
+
+      - name: Analyze Dart
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: flutter test
+
+      - name: Build release APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: flutter build apk --release
+
+      - name: Publish APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DzTorqscan-android-apk
+          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
