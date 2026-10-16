@@ -219,6 +219,30 @@ jobs:
               s = re.sub(r'compileSdk\\s*=\\s*\\d+', 'compileSdk = 37', s)
               p.write_text(s)
           PY
+      - name: Normalize Android entry point and SDK
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path("android/app/src/main/kotlin")
+          files = list(root.rglob("MainActivity.kt")) if root.exists() else []
+          if files:
+              target = files[0]
+              # Keep a single unambiguous FlutterActivity entry point.
+              target.write_text("package com.example.torqscan\n\nimport io.flutter.embedding.android.FlutterActivity\n\nclass MainActivity : FlutterActivity()\n")
+              for duplicate in files[1:]:
+                  duplicate.unlink()
+          gradle = Path("android/app/build.gradle")
+          if gradle.exists():
+              text = gradle.read_text()
+              text = re.sub(r"compileSdkVersion\\s+\\d+", "compileSdkVersion 37", text)
+              text = re.sub(r"compileSdk\\s*=\\s*\\d+", "compileSdk = 37", text)
+              if "compileSdk" not in text:
+                  text = text.replace("android {", "android {\\n    compileSdk = 37", 1)
+              gradle.write_text(text)
+          PY
       - name: Build release APK
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter build apk --release --no-pub --android-skip-build-dependency-validation
