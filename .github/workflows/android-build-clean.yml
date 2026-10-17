@@ -39,8 +39,8 @@ jobs:
             archive="$(find . -maxdepth 1 -type f -name 'DzTorqscan_source_recovery_v*.zip' | sort -V | tail -n 1)"
             test -n "$archive"
             unzip -oq "$archive" -d extracted
-            project="$(find extracted -maxdepth 4 -name pubspec.yaml -print -quit)"
-            test -n "$project"
+            project="$(find extracted -maxdepth 10 -type f -name pubspec.yaml -print -quit)"
+            test -n "$project" || { echo "ERROR: pubspec.yaml not found in recovery archive"; exit 1; }
             echo "PROJECT_DIR=$(dirname "$project")" >> "$GITHUB_ENV"
           else
             echo "PROJECT_DIR=." >> "$GITHUB_ENV"
