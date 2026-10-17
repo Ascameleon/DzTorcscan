@@ -2,6 +2,11 @@ name: DzTorqscan APK Build
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'DzTorqscan_source_recovery_v*.zip'
+      - '.github/workflows/android-build-clean.yml'
   push:
     paths:
       - 'DzTorqscan_source_recovery_v*.zip'
