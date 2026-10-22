@@ -20,41 +20,58 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: Extract v1.4.0 source
+
+      - name: Extract source
         run: |
           unzip -oq DzTorqscan_v1.4.0_complete.zip -d src
-          cd src
-          if [ -f pubspec.yaml ]; then echo "PROJECT_DIR=src" >> $GITHUB_ENV
-          elif [ -f obd2_scanner/pubspec.yaml ]; then
-            echo "PROJECT_DIR=src/obd2_scanner" >> $GITHUB_ENV
-          else
-            echo "No pubspec.yaml" >&2; exit 1
-          fi
-      - name: Prepare Android platform
+          if [ -f src/pubspec.yaml ]; then echo "PROJECT_DIR=src" >> $GITHUB_ENV
+          elif [ -f src/obd2_scanner/pubspec.yaml ]; then echo "PROJECT_DIR=src/obd2_scanner" >> $GITHUB_ENV
+          else echo "No pubspec" >&2; exit 1; fi
+
+      - name: Flutter create Android scaffolding
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: flutter create . --platforms=android --project-name torqscan --org com.dztorqscan
+
+      - name: Force AGP 8.9 + fix package
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          flutter create . --platforms=android --project-name torqscan --org com.dztorqscan
-          # Keep our app id / namespace
-          sed -i 's/applicationId = .*/applicationId = "com.dztorqscan.app"/' android/app/build.gradle.kts 2>/dev/null || true
-          sed -i 's/namespace = .*/namespace = "com.dztorqscan.app"/' android/app/build.gradle.kts 2>/dev/null || true
-          if [ -f android/app/build.gradle ]; then
-            sed -i 's/applicationId .*/applicationId "com.dztorqscan.app"/' android/app/build.gradle
-            sed -i 's/namespace .*/namespace "com.dztorqscan.app"/' android/app/build.gradle
-          fi
-          # Permissions OBD
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          if ! grep -q 'BLUETOOTH_CONNECT' "$MANIFEST"; then
-            sed -i 's|<manifest|<manifest xmlns:tools="http://schemas.android.com/tools"|' "$MANIFEST"
-            sed -i '/<application/i\    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />' "$MANIFEST"
-          fi
-          chmod +x android/gradlew || true
-      - name: Flutter pub get
+          set -e
+          # Force AGP 8.9.1 everywhere (avoid AGP 9)
+          find android -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 | xargs -0 sed -i \
+            -e 's/com\.android\.application["'\'']* version ["'\'']9\.[0-9.]*["'\'']/com.android.application" version "8.9.1"/g' \
+            -e 's/version["'\'']* ["'\'']9\.[0-9.]*["'\''] apply false/version "8.9.1" apply false/g' \
+            -e 's/id("com.android.application") version "9\.[0-9.]*"/id("com.android.application") version "8.9.1"/g'
+
+          # applicationId
+          for f in android/app/build.gradle android/app/build.gradle.kts; do
+            [ -f "$f" ] || continue
+            sed -i 's/applicationId *= *["'\''][^"'\'']*["'\'']/applicationId = "com.dztorqscan.app"/' "$f"
+            sed -i 's/namespace *= *["'\''][^"'\'']*["'\'']/namespace = "com.dztorqscan.app"/' "$f"
+            sed -i 's/applicationId ["'\''][^"'\'']*["'\'']/applicationId "com.dztorqscan.app"/' "$f"
+            sed -i 's/namespace ["'\''][^"'\'']*["'\'']/namespace "com.dztorqscan.app"/' "$f"
+          done
+
+          chmod +x android/gradlew
+          echo "=== AGP lines ==="
+          grep -RIn 'com.android.application' android --include='*.gradle' --include='*.gradle.kts' || true
+
+      - name: Pub get
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter pub get
-      - name: Build release APK
+
+      - name: Build APK
         working-directory: ${{ env.PROJECT_DIR }}
-        run: flutter build apk --release
+        run: flutter build apk --release 2>&1 | tee build.log
+
+      - name: Upload log if failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ${{ env.PROJECT_DIR }}/build.log
+
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: DzTorqscan-release-apk
