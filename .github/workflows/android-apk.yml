@@ -60,7 +60,7 @@ jobs:
             exit 1
           fi
           find android -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 |
-            xargs -0 -r sed -i 's/9\.0\.0/8.11.1/g; s/2\.2\.10/2.2.20/g'
+            xargs -0 -r sed -i 's/9\.0\.0/8.11.1/g; s/2\.0\.0/2.2.20/g; s/2\.1\.0/2.2.20/g; s/2\.2\.10/2.2.20/g'
           WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
           if [ ! -f "$WRAPPER" ]; then
             echo "::warning::Gradle wrapper properties are missing; creating a compatible distribution configuration."
