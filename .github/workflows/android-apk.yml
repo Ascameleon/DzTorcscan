@@ -76,13 +76,21 @@ jobs:
           else
             sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.14.3-\1.zip#' "$WRAPPER"
           fi
-          if [ ! -f android/gradlew ]; then
-            echo "::error::Android Gradle launcher android/gradlew is missing from the source archive."
-            exit 1
-          fi
-          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "::error::Gradle wrapper JAR is missing from the source archive."
-            exit 1
+          if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "::warning::Gradle launcher or wrapper JAR is missing; installing a lightweight launcher for Gradle 8.14.3."
+            printf '%s\n' \
+              '#!/usr/bin/env bash' \
+              'set -euo pipefail' \
+              'GRADLE_VERSION=8.14.3' \
+              'GRADLE_HOME="${HOME}/.gradle/manual/gradle-${GRADLE_VERSION}"' \
+              'if [ ! -x "${GRADLE_HOME}/bin/gradle" ]; then' \
+              '  mkdir -p "$(dirname "$GRADLE_HOME")"' \
+              '  TMP_ZIP="$(mktemp)"' \
+              '  curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o "$TMP_ZIP"' \
+              '  unzip -q "$TMP_ZIP" -d "$(dirname "$GRADLE_HOME")"' \
+              '  rm -f "$TMP_ZIP"' \
+              'fi' \
+              'exec "${GRADLE_HOME}/bin/gradle" "$@"' > android/gradlew
           fi
           chmod +x android/gradlew
           echo "Gradle wrapper configuration:"
