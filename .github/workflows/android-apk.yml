@@ -59,10 +59,18 @@ jobs:
             echo "::error::Android settings.gradle not found."
             exit 1
           fi
-          # Keep the project on the compatible AGP 8.x line and meet Flutter's Kotlin minimum.
-          sed -i 's/9\.0\.0/8.9.1/g; s/2\.2\.10/2.2.20/g' "$SETTINGS"
-          echo "Applied compatible Android Gradle Plugin/Kotlin versions:"
-          grep -E 'com.android.application|org.jetbrains.kotlin.android|kotlin' "$SETTINGS" || true
+          # Normalize plugin versions across Android Gradle files, not just settings.gradle.
+          find android -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 |
+            xargs -0 -r sed -i 's/9\.0\.0/8.9.1/g; s/2\.2\.10/2.2.20/g'
+          WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
+          if [ ! -f "$WRAPPER" ]; then
+            echo "::error::Gradle wrapper properties not found."
+            exit 1
+          fi
+          sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.14.3-\1.zip#' "$WRAPPER"
+          echo "Normalized Android Gradle files:"
+          grep -R -n -E '9\.0\.0|2\.2\.10|distributionUrl' android --include='*.gradle' --include='*.gradle.kts' --include='gradle-wrapper.properties' || true
+          cat "$WRAPPER"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
