@@ -59,17 +59,34 @@ jobs:
             echo "::error::Android settings.gradle not found."
             exit 1
           fi
-          # Normalize plugin versions across Android Gradle files, not just settings.gradle.
           find android -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 |
             xargs -0 -r sed -i 's/9\.0\.0/8.9.1/g; s/2\.2\.10/2.2.20/g'
           WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
           if [ ! -f "$WRAPPER" ]; then
-            echo "::error::Gradle wrapper properties not found."
+            echo "::warning::Gradle wrapper properties are missing; creating a compatible distribution configuration."
+            mkdir -p "$(dirname "$WRAPPER")"
+            cat > "$WRAPPER" <<'PROPERTIES'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.3-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+PROPERTIES
+          else
+            sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.14.3-\1.zip#' "$WRAPPER"
+          fi
+          if [ ! -f android/gradlew ]; then
+            echo "::error::Android Gradle launcher android/gradlew is missing from the source archive."
             exit 1
           fi
-          sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.14.3-\1.zip#' "$WRAPPER"
-          echo "Normalized Android Gradle files:"
-          grep -R -n -E '9\.0\.0|2\.2\.10|distributionUrl' android --include='*.gradle' --include='*.gradle.kts' --include='gradle-wrapper.properties' || true
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "::error::Gradle wrapper JAR is missing from the source archive."
+            exit 1
+          fi
+          chmod +x android/gradlew
+          echo "Gradle wrapper configuration:"
           cat "$WRAPPER"
 
       - name: Set up Java 17
