@@ -46,6 +46,24 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Flutter project found at: $PROJECT_DIR"
 
+      - name: Normalize Android build plugin versions
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SETTINGS=""
+          for candidate in android/settings.gradle android/settings.gradle.kts; do
+            if [ -f "$candidate" ]; then SETTINGS="$candidate"; break; fi
+          done
+          if [ -z "$SETTINGS" ]; then
+            echo "::error::Android settings.gradle not found."
+            exit 1
+          fi
+          # Keep the project on the compatible AGP 8.x line and meet Flutter's Kotlin minimum.
+          sed -i 's/9\.0\.0/8.9.1/g; s/2\.2\.10/2.2.20/g' "$SETTINGS"
+          echo "Applied compatible Android Gradle Plugin/Kotlin versions:"
+          grep -E 'com.android.application|org.jetbrains.kotlin.android|kotlin' "$SETTINGS" || true
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
