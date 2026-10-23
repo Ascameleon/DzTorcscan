@@ -59,8 +59,17 @@ jobs:
             echo "::error::Android settings.gradle not found."
             exit 1
           fi
-          find android -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 |
+          # Kotlin may be declared in settings.gradle, a version catalog, or a
+          # Gradle properties file. Normalize all build configuration files,
+          # not only files directly under android/.
+          find . -type f \( -name '*.gradle' -o -name '*.gradle.kts' -o -name '*.toml' -o -name 'gradle.properties' \) -not -path './.git/*' -print0 |
             xargs -0 -r sed -i 's/9\.0\.0/8.11.1/g; s/2\.0\.0/2.2.20/g; s/2\.1\.0/2.2.20/g; s/2\.2\.10/2.2.20/g'
+          echo "Resolved Kotlin and Android Gradle Plugin declarations:"
+          grep -RInE 'kotlin[^[:cntrl:]]*2\.0\.0|org\.jetbrains\.kotlin[^[:cntrl:]]*2\.0\.0|com\.android\.application[^[:cntrl:]]*9\.0\.0' . --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='gradle.properties' || true
+          if grep -RInE 'kotlin[^[:cntrl:]]*2\.0\.0|org\.jetbrains\.kotlin[^[:cntrl:]]*2\.0\.0' android gradle --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='gradle.properties' 2>/dev/null; then
+            echo "::error::Kotlin 2.0.0 is still declared in Android build configuration."
+            exit 1
+          fi
           WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
           if [ ! -f "$WRAPPER" ]; then
             echo "::warning::Gradle wrapper properties are missing; creating a compatible distribution configuration."
