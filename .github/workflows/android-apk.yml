@@ -66,14 +66,14 @@ jobs:
             echo "::warning::Gradle wrapper properties are missing; creating a compatible distribution configuration."
             mkdir -p "$(dirname "$WRAPPER")"
             cat > "$WRAPPER" <<'PROPERTIES'
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.3-bin.zip
-networkTimeout=10000
-validateDistributionUrl=true
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-PROPERTIES
+            distributionBase=GRADLE_USER_HOME
+            distributionPath=wrapper/dists
+            distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.3-bin.zip
+            networkTimeout=10000
+            validateDistributionUrl=true
+            zipStoreBase=GRADLE_USER_HOME
+            zipStorePath=wrapper/dists
+            PROPERTIES
           else
             sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.14.3-\1.zip#' "$WRAPPER"
           fi
