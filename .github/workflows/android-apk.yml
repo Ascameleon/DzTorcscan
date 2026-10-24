@@ -59,38 +59,58 @@ jobs:
             echo "::error::Android settings.gradle not found."
             exit 1
           fi
-          # Force Kotlin 2.2.20 for modern and legacy Gradle declaration formats.
-          find . -type f \\( -name '*.gradle' -o -name '*.gradle.kts' -o -name '*.toml' -o -name 'gradle.properties' \\) -not -path './.git/*' -print0 |
-            xargs -0 -r sed -i -E \
-              -e 's/(kotlin_version[[:space:]]*=[[:space:]]*["'\'' ])2\\.[0-9]+\\.[0-9]+/\\12.2.20/g' \
-              -e 's/(kotlin[[:space:]]*=[[:space:]]*["'\'' ])2\\.[0-9]+\\.[0-9]+/\\12.2.20/g' \
-              -e 's/(org\\.jetbrains\\.kotlin\\.android[^[:cntrl:]]*version[[:space:]]*["'\'' ])2\\.[0-9]+\\.[0-9]+/\\12.2.20/g' \
-              -e 's/(org\\.jetbrains\\.kotlin[^[:cntrl:]]*version[[:space:]]*["'\'' ])2\\.[0-9]+\\.[0-9]+/\\12.2.20/g' \
-              -e 's/9\\.0\\.0/8.11.1/g'
-          echo "Kotlin/Gradle declarations after normalization:"
-          grep -RInE 'kotlin|org\\.jetbrains\\.kotlin|com\\.android\\.application' . --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='gradle.properties' || true
-          if grep -RInE '2\\.0\\.0|2\\.1\\.0|2\\.2\\.10' android --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='gradle.properties'; then
-            echo "::error::An outdated Kotlin version remains in Android Gradle configuration."
-            exit 1
-          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          patterns = [
+              (re.compile(r'(?i)(kotlin_version\s*=\s*[\'" ]+)2\.\d+\.\d+'), r'\g<1>2.2.20'),
+              (re.compile(r'(?i)(kotlin\s*=\s*[\'" ]+)2\.\d+\.\d+'), r'\g<1>2.2.20'),
+              (re.compile(r'(?i)(org\.jetbrains\.kotlin(?:\.android)?[^\n]*?version\s*[\'" ]+)2\.\d+\.\d+'), r'\g<1>2.2.20'),
+              (re.compile(r'(?i)(com\.android\.application[^\n]*?version\s*[\'" ]+)9\.0\.0'), r'\g<1>8.11.1'),
+          ]
+          suffixes = {'.gradle', '.kts', '.toml', '.properties'}
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or path.suffix not in suffixes:
+                  continue
+              if '.git' in path.parts or 'build' in path.parts:
+                  continue
+              try:
+                  original = path.read_text()
+              except (UnicodeDecodeError, OSError):
+                  continue
+              updated = original
+              for pattern, replacement in patterns:
+                  updated = pattern.sub(replacement, updated)
+              if updated != original:
+                  path.write_text(updated)
+          # Explicitly check for stale versions in Android Gradle configuration.
+          stale = re.compile(r'2\.(?:0\.0|1\.0|2\.10)')
+          config_files = [p for p in Path('android').rglob('*') if p.is_file() and p.suffix in suffixes]
+          matches = [(str(p), i, line) for p in config_files for i, line in enumerate(p.read_text(errors='ignore').splitlines(), 1) if stale.search(line) and 'kotlin' in line.lower()]
+          if matches:
+              for path, line_no, line in matches:
+                  print(f'{path}:{line_no}: {line}')
+              raise SystemExit('::error::An outdated Kotlin version remains in Android Gradle configuration.')
+          print('Kotlin plugin declarations normalized to 2.2.20 where declared.')
+          PY
           WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
           if [ ! -f "$WRAPPER" ]; then
             echo "::warning::Gradle wrapper properties are missing; creating a compatible distribution configuration."
             mkdir -p "$(dirname "$WRAPPER")"
-            printf '%s\n' \
+            printf '%s\\n' \
               'distributionBase=GRADLE_USER_HOME' \
               'distributionPath=wrapper/dists' \
-              'distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.3-bin.zip' \
+              'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip' \
               'networkTimeout=10000' \
               'validateDistributionUrl=true' \
               'zipStoreBase=GRADLE_USER_HOME' \
               'zipStorePath=wrapper/dists' > "$WRAPPER"
           else
-            sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.14.3-\1.zip#' "$WRAPPER"
+            sed -i -E 's#gradle-[0-9.]+-(all|bin)\\.zip#gradle-8.14.3-\\1.zip#' "$WRAPPER"
           fi
           if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
             echo "::warning::Gradle launcher or wrapper JAR is missing; installing a lightweight launcher for Gradle 8.14.3."
-            printf '%s\n' \
+            printf '%s\\n' \
               '#!/usr/bin/env bash' \
               'set -euo pipefail' \
               'GRADLE_VERSION=8.14.3' \
