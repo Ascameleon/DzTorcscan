@@ -59,15 +59,18 @@ jobs:
             echo "::error::Android settings.gradle not found."
             exit 1
           fi
-          # Kotlin may be declared in settings.gradle, a version catalog, or a
-          # Gradle properties file. Normalize all build configuration files,
-          # not only files directly under android/.
-          find . -type f \( -name '*.gradle' -o -name '*.gradle.kts' -o -name '*.toml' -o -name 'gradle.properties' \) -not -path './.git/*' -print0 |
-            xargs -0 -r sed -i 's/9\.0\.0/8.11.1/g; s/2\.0\.0/2.2.20/g; s/2\.1\.0/2.2.20/g; s/2\.2\.10/2.2.20/g'
-          echo "Resolved Kotlin and Android Gradle Plugin declarations:"
-          grep -RInE 'kotlin[^[:cntrl:]]*2\.0\.0|org\.jetbrains\.kotlin[^[:cntrl:]]*2\.0\.0|com\.android\.application[^[:cntrl:]]*9\.0\.0' . --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='gradle.properties' || true
-          if grep -RInE 'kotlin[^[:cntrl:]]*2\.0\.0|org\.jetbrains\.kotlin[^[:cntrl:]]*2\.0\.0' android gradle --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='gradle.properties' 2>/dev/null; then
-            echo "::error::Kotlin 2.0.0 is still declared in Android build configuration."
+          # Force Kotlin 2.2.20 for modern and legacy Gradle declaration formats.
+          find . -type f \\( -name '*.gradle' -o -name '*.gradle.kts' -o -name '*.toml' -o -name 'gradle.properties' \\) -not -path './.git/*' -print0 |
+            xargs -0 -r sed -i -E \
+              -e 's/(kotlin_version[[:space:]]*=[[:space:]]*["'\'' ])2\\.[0-9]+\\.[0-9]+/\\12.2.20/g' \
+              -e 's/(kotlin[[:space:]]*=[[:space:]]*["'\'' ])2\\.[0-9]+\\.[0-9]+/\\12.2.20/g' \
+              -e 's/(org\\.jetbrains\\.kotlin\\.android[^[:cntrl:]]*version[[:space:]]*["'\'' ])2\\.[0-9]+\\.[0-9]+/\\12.2.20/g' \
+              -e 's/(org\\.jetbrains\\.kotlin[^[:cntrl:]]*version[[:space:]]*["'\'' ])2\\.[0-9]+\\.[0-9]+/\\12.2.20/g' \
+              -e 's/9\\.0\\.0/8.11.1/g'
+          echo "Kotlin/Gradle declarations after normalization:"
+          grep -RInE 'kotlin|org\\.jetbrains\\.kotlin|com\\.android\\.application' . --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='gradle.properties' || true
+          if grep -RInE '2\\.0\\.0|2\\.1\\.0|2\\.2\\.10' android --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='gradle.properties'; then
+            echo "::error::An outdated Kotlin version remains in Android Gradle configuration."
             exit 1
           fi
           WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
